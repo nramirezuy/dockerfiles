@@ -1,0 +1,51 @@
+---
+name: Docker Build Push emanote
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+    paths:
+      - enamnote/Dockerfile
+      - .github/workflows/docker_build_push_emanote.yaml
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 1'
+
+jobs:
+  get-lastest-emanote-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.lastcommit.outputs.shorthash }}
+    steps:
+      - id: lastcommit
+        uses: nmbgeek/github-action-get-latest-commit@main
+        with:
+          owner: srid
+          repo: emanote
+          branch: master
+  docker_build_push:
+    name: Docker Build and Publish
+    needs: get-lastest-emanote-version
+    uses: ./.github/workflows/docker_build_push.yaml
+    with:
+      repo_tags: "
+        ${{ github.repository_owner }}/emanote:\
+        ${{ needs.get-lastest-emanote-version.outputs.version }}
+
+        ${{ github.repository_owner }}/emanote:latest
+
+        ghcr.io/${{ github.repository_owner }}/emanote:\
+        ${{ needs.get-lastest-emanote-version.outputs.version }}
+
+        ghcr.io/${{ github.repository_owner }}/emanote:latest
+        "
+      context: emanote
+      build-args: |
+        EMANOTE_VERSION=${{ needs.get-lastest-emanote-version.outputs.version }}
+    secrets:
+      DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    permissions:
+      contents: read
+      packages: write
